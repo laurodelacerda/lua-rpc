@@ -1,7 +1,15 @@
 
 local luarpc = {}
-
 local socketsOccupied = {}
+
+local function parser(idl)
+	local prototypes = {}
+	function interface(idl)
+		prototypes = idl.methods
+	end
+   dofile(idl)
+	return prototypes
+end
 
 function luarpc.createServant(servantObject, idl)
 

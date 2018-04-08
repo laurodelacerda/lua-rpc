@@ -1,4 +1,4 @@
-return { name = "minhaInt",
+interface { name = "minhaInt",
             methods = {
                foo = {
                  resulttype = "double",

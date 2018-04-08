@@ -5,18 +5,51 @@ local socketsOccupied = {}
 local function parser(idl)
 	local prototypes = {}
 	function interface(idl)
-		prototypes = idl.methods
+      for name,sig in pairs(idl.methods) do
+         local func = {}
+         func.output = {}
+         func.input = {}
+         table.insert(func.output, sig.resulttype)
+         local args = sig.args 
+         for i=1, #args do
+            if string.match(args[i].direction, 'out') then
+               table.insert(func.output, args[i].type)
+            end
+
+            if string.match(args[i].direction, 'in') then
+               table.insert(func.input, args[i].type)
+            end
+         end
+         prototypes[name] = func
+      end
 	end
    dofile(idl)
 	return prototypes
 end
 
-function luarpc.createServant(servantObject, idl)
+function luarpc.dumpParser(idl)
+   t =  parser(idl)
+   require 'pl.pretty'.dump(t)
+end
 
+local function validateArgs(args, sig)
+   local input = sig.input
+   for i=1, #input do
+      if #args < i then
+         return false
+      end
+      local t = type(args[i])
+   end
+end
+
+local function packArgs(args, sig)
+end
+
+function luarpc.createServant(servantObject, idl)
 	-- lendo a interface
 	io.input(idl)
 	local input = io.read("*all")
-	input = string.gsub(input, "^interface", "return")
+	--input = string.gsub(input, "^interface", "return")
 	local f = loadstring(input)
 	local interface = f()
 
@@ -48,50 +81,42 @@ function luarpc.waitIncoming()
 end 
 
 function luarpc.createProxy(hostname, port, idl)
+   -- inicializa uma tabela vazia que será o stub do objeto remoto
+   local proxy = {}
 
-		-- lendo a interface
-	io.input(idl)
-	local input = io.read("*all")
-	input = string.gsub(input, "^interface", "return")
-	local f = loadstring(input)
-	local interface = f()
+   -- extrai as funções da interface
+	local prototypes = parser(idl)
 
-	local functions = {}
-	local prototypes = parser(interface)
-
-	print(prototypes)
-
+   -- cria a implementacao do stub para as funções da idl
 	for name, sig in pairs(prototypes) do
-		
-		--[[
-		functions[name] = function (...)
-		-- validar parâmetros
-		local params = {...}
-		--]]
+      proxy[name] = function(...)
+         local args = {...}
 
-		local values = {name}
+--[[
+         if ~validateArgs(args, sig) then
+            return '___ERRORPC: metodo invalido'
+         end
+]]--
+         local request = name..'\n'
+         request = request .. args[1]..'\n'
 
-		local types = sig.input
+--         print(request)
 
-		for i = 1, #types do
-			if (#params >= i ) then
-				values[#values+1] = params[i]
-			end
-			if (type(params[i]) ~= "number") then
-				values[#values] = "\"" .. values[#values] .. "\""
-			end
-		end
+         -- chamada remota
+         local server = socket.connect(hostname, port)
+         
+         server:send(request)
 
-		-- creating request
-		local request = pack(values)
-
-		-- creating socket 
-		local client = socket.tcp()
-
-
-
+         local ans, err = server:receive()
+         
+         if err then
+            return '___ERRORPC'
+         end
+         return ans
+      end
 	end
 
+   return proxy
 end
 
 return luarpc

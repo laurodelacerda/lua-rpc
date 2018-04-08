@@ -1,0 +1,8 @@
+interface {	name = "simpleIdl",
+		methods = {
+		foo = {resulttype = "string",
+		 	args = {{ direction = "in", type = "string"}}
+
+		}
+		}		
+	}

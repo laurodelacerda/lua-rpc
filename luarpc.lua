@@ -1,6 +1,7 @@
 
 local luarpc = {}
-local socketsOccupied = {}
+local servers = {}
+local objects = {}
 
 local function parser(idl)
 	local prototypes = {}
@@ -51,7 +52,6 @@ function luarpc.createServant(servantObject, idl)
 	local input = io.read("*all")
 	--input = string.gsub(input, "^interface", "return")
 	local f = loadstring(input)
-	local interface = f()
 
 	-- reservando socket
 	socket = require("socket")
@@ -59,26 +59,50 @@ function luarpc.createServant(servantObject, idl)
 	local ip, port = server:getsockname()
 
 	-- guardando o (socket, objeto) utilizado na tabela
-	table.insert(socketsOccupied, port)
+	table.insert(servers, server)
+
+	objects[server] = servantObject
 	
-	return ip, port ;
+	return server ;
 
 end
 
 function luarpc.waitIncoming()
 -- TODO Tratar envio de mensagens fora do padrão do protocolo acordado.
 	while 1 do
+		local canRead = socket.select(servers, nil)
 
-	    local client = server:accept()
+		for _, server in ipairs(canRead) do
 
-	    local line, err = client:receive()
+			local object = objects[server]
+	
+			local client = server:accept()
 
-	    if err then 
-		    client:close()
-	    end
+			local name, err = client:receive()
+
+			print(name)
+
+			local params = {}
+
+			local param1, err = client:receive()
+
+			table.insert(params, param1)	
+
+			local result = object[name](table.unpack(params))
+
+			client:send(result .. "\n")
+
+--			if err then 
+
+--			end
+
+			client:close()
+		end		
 	end
 
 end 
+
+
 
 function luarpc.createProxy(hostname, port, idl)
    -- inicializa uma tabela vazia que será o stub do objeto remoto
@@ -103,6 +127,8 @@ function luarpc.createProxy(hostname, port, idl)
 --         print(request)
 
          -- chamada remota
+		local socket = require("socket")
+
          local server = socket.connect(hostname, port)
          
          server:send(request)

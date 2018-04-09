@@ -43,7 +43,21 @@ local function validateArgs(args, sig)
    end
 end
 
-local function packArgs(args, sig)
+local function packArgs(method, args, sig)
+      local request = method..'\n'
+      for i=1,#sig do
+            if (sig[i] == 'string' or sig[i] == 'char') then
+                  request = request..string.gsub(args[i], '\n', '\\:-)\\')
+            else
+                  request = request..tostring(args[i])
+            end
+
+            request = request..'\n'
+      end
+      return request
+end
+
+local function unpackArgs(method, args, sig)
 end
 
 function luarpc.createServant(servantObject, idl)
@@ -63,7 +77,7 @@ function luarpc.createServant(servantObject, idl)
 
 	objects[server] = servantObject
 	
-	return server ;
+	return server
 
 end
 
@@ -86,24 +100,24 @@ function luarpc.waitIncoming()
 
 			local param1, err = client:receive()
 
-			table.insert(params, param1)	
+                  table.insert(params, param1)
+
+                  require 'pl.pretty'.dump(params)
 
 			local result = object[name](table.unpack(params))
 
-			client:send(result .. "\n")
+                  client:send('\n') -- mensagem indicando sucesso no processamento da chamada pelo server
 
---			if err then 
+			client:send(result .. "\n") -- resultado da chamada
 
---			end
-
-			client:close()
+                  client:close()
 		end		
 	end
 
 end 
 
 -- valida os argumentos de entrada na proxy, retorna nil se não houver erros, ou o primeiro erro encontrado
-local function validateArgsProxy(args, expectedArgs) 
+local function validateLocalArgs(args, expectedArgs) 
       for i=1, #expectedArgs do
             if (#args < i) then
                   return nil
@@ -126,10 +140,37 @@ local function validateArgsProxy(args, expectedArgs)
       return nil
 end
 
+local function validateResults(result, expectedArgs)
+      for i=1, #expectedArgs do            
+      end
+end
+
+local function validateRemoteArgs(args, expectedArgs)
+      for i=1, #expectedArgs do
+            if (#args < i) then
+                  return nil
+            end
+
+            if (expectedArgs[i] == 'double') then
+                  return "Expected double and received "..tostring(t)
+            elseif (expectedArgs[i] == 'char' and (t ~= 'string' or string.len(args[i]) > 1)) then
+                  if (t == 'string') then
+                        return "Expected char and received string with more than 1 character"
+                  else
+                        return "Expected char and received "..tostring(t)
+                  end
+            elseif (expectedArgs[i] == 'string' and t ~= 'string') then
+                  return "Expected string and received "..tostring(t)
+            end
+      end
+
+      return nil 
+end
+
 function luarpc.testValidateInputArgs(method, args, idl)
       local prototypes = parser(idl)
       local sig = prototypes[method]
-      return validateArgsProxy(args, sig.input)
+      return validateLocalArgs(args, sig.input)
 end
 
 function luarpc.createProxy(hostname, port, idl)
@@ -141,31 +182,50 @@ function luarpc.createProxy(hostname, port, idl)
 
    -- cria a implementacao do stub para as funções da idl
 	for name, sig in pairs(prototypes) do
-      proxy[name] = function(...)
-         local args = {...}
+            proxy[name] = function(...)
+                  local args = {...}
 
-         local inputError = validateArgsProxy(args, sig.input)
-         if inputError  then
-            return '___ERRORPC: '..inputError
-         end
+                  local inputError = validateLocalArgs(args, sig.input)
+                  if inputError  then
+                        return '___ERRORPC: '..inputError
+                  end
+            
+                  -- abre a conexão com o servidor
+                  local socket = require("socket")
+                  local server = socket.connect(hostname, port)
 
-         local request = name..'\n'
-         request = request .. args[1]..'\n'
+                  -- empacota os parametros
+                  local request = packArgs(name, args, sig.input)
 
-         -- chamada remota
-	   local socket = require("socket")
+                  -- envia a faz a chamada remota
+                  server:send(request)
 
-         local server = socket.connect(hostname, port)
-         
-         server:send(request)
+                  -- aguarda a resposta do servidor
+                  local ans, err = server:receive()
 
-         local ans, err = server:receive()
-         
-         if err then
-            return '___ERRORPC'
-         end
-         return ans
-      end
+                  if err then 
+                        return '___ERRORPC: '..err
+                  end
+                  -- o primeiro parametro retornado deve ser o status indicando se houve erro no processamento da chamada
+                  if ans ~= '' then
+                        return '___ERRORPC: '..ans
+                  end
+
+                  -- obtem tantas mensagens quantos forem os parâmetros de saída definidos na idl
+                  local result = {}
+                  for i=1, #sig.output do
+                        ans, err = server:receive()
+                        if err then
+                              return '___ERRORPC: '..err
+                        end
+
+                        table.insert(result, ans)
+                  end
+
+                  -- TODO validar e converter os parâmetros de saída recebidos para ficar de acordo com a idl
+
+                  return table.unpack(result)
+            end
 	end
 
    return proxy

@@ -17,11 +17,11 @@ myobj2 = { foo =
              end
         }
 
-myobj3={	foo = 
+myobj3 = {	foo = 
 	function(a)
 		return a
 	end
-      }
+}
 
 luarpc = require("luarpc")
 

@@ -1,0 +1,25 @@
+interface {	name = "testIdl",
+		methods = {
+            foo = {
+                resulttype = "string",
+                args = {
+                    { direction = "in", type = "string"},
+                    { direction = "in", type = "char" },
+                    { direction = "in", type = "double" },
+                    { direction = "in", type = "void" }
+                }
+            },
+            char = {
+                resulttype = "string",
+                args = {
+                    { direction = "in", type = "char" }
+                }
+            },
+            string = {
+                resulttype = "void",
+                args = {
+                    { direction = "in", type = "string" }
+                }
+            }
+		}		
+	}

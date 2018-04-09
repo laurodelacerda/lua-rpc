@@ -102,7 +102,35 @@ function luarpc.waitIncoming()
 
 end 
 
+-- valida os argumentos de entrada na proxy, retorna nil se não houver erros, ou o primeiro erro encontrado
+local function validateArgsProxy(args, expectedArgs) 
+      for i=1, #expectedArgs do
+            if (#args < i) then
+                  return nil
+            end
 
+            local t = type(args[i])
+            if (expectedArgs[i] == 'double' and t ~= 'number') then
+                  return "Expected double and received "..tostring(t)
+            elseif (expectedArgs[i] == 'char' and (t ~= 'string' or string.len(args[i]) > 1)) then
+                  if (t == 'string') then
+                        return "Expected char and received string with more than 1 character"
+                  else
+                        return "Expected char and received "..tostring(t)
+                  end
+            elseif (expectedArgs[i] == 'string' and t ~= 'string') then
+                  return "Expected string and received "..tostring(t)
+            end
+      end
+
+      return nil
+end
+
+function luarpc.testValidateInputArgs(method, args, idl)
+      local prototypes = parser(idl)
+      local sig = prototypes[method]
+      return validateArgsProxy(args, sig.input)
+end
 
 function luarpc.createProxy(hostname, port, idl)
    -- inicializa uma tabela vazia que será o stub do objeto remoto
@@ -116,18 +144,16 @@ function luarpc.createProxy(hostname, port, idl)
       proxy[name] = function(...)
          local args = {...}
 
---[[
-         if ~validateArgs(args, sig) then
-            return '___ERRORPC: metodo invalido'
+         local inputError = validateArgsProxy(args, sig.input)
+         if inputError  then
+            return '___ERRORPC: '..inputError
          end
-]]--
+
          local request = name..'\n'
          request = request .. args[1]..'\n'
 
---         print(request)
-
          -- chamada remota
-		local socket = require("socket")
+	   local socket = require("socket")
 
          local server = socket.connect(hostname, port)
          

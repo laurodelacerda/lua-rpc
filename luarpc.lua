@@ -84,12 +84,28 @@ function luarpc.waitIncoming()
 
 			local params = {}
 
+         local prototypes = parser(idl)
+         
+
+         --[[
+         for param, sig in pairs(prototypes[name]) do
+
+            local param, err = client:receive()
+
+            table.insert(params, param)
+            require 'pl.pretty'.dump(params)
+
+            -- local inputError = validateValueArgs()
+
+         end 
+         --]]  
+         
 			local param1, err = client:receive()
 
                   table.insert(params, param1)
 
                   -- require 'pl.pretty'.dump(params)
-
+         
 			local result = object[name](table.unpack(params))
 
                   client:send('\n') -- mensagem indicando sucesso no processamento da chamada pelo server

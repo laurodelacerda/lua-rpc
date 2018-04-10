@@ -68,26 +68,27 @@ function luarpc.createServant(servantObject, idl)
 end
 
 function luarpc.waitIncoming()
+
 -- TODO Tratar envio de mensagens fora do padrão do protocolo acordado.
 	while 1 do
-		local canRead = socket.select(servers, nil)
+
+	local canRead = socket.select(servers, nil)
 
 		for _, server in ipairs(canRead) do
 
-			local object = objects[server]
-	
-			local client = server:accept()
+--[[
+-- O código cliente deve tentar fazer a conversão dos argumentos que 
+-- foram enviados para tipos especificados na interface (e gerar erros nos casos 
+-- em que isso não é possível: por exemplo, se o programa fornece um string com 
+-- letras onde se espera um parâmetro double). 
 
-			local name, err = client:receive()
+-- A função luarpc.waitIncoming pode ser executada depois de diversas chamadas a
+-- luarpc.createServant, como indicado no exemplo, e deve fazer com que o processo
+-- servidor entre em um loop onde ele espera pedidos de execução de chamadas a 
+-- qualquer um dos objetos serventes criados anteriormente, atende esse pedido, 
+-- e volta a esperar o próximo pedido (ou seja, não há concorrência no servidor!). 
+-- Provavelmente você terá que usar a chamada select para programá-la.
 
-			print(name)
-
-			local params = {}
-
-         local prototypes = parser(idl)
-         
-
-         --[[
          for param, sig in pairs(prototypes[name]) do
 
             local param, err = client:receive()
@@ -98,24 +99,44 @@ function luarpc.waitIncoming()
             -- local inputError = validateValueArgs()
 
          end 
-         --]]  
+--]] 
+			local object = objects[server]
+
+			local client = server:accept()
+
+			-- obtem o nome da função
+			local name, err = client:receive()
+			-- print(name)
+
+			local params = {}
+
+        		local prototypes = parser(idl)
+
+			local signatures = prototypes[name].input
+
+			local args = select("#", signatures)
+
+			for i=1, args do
+				local param, err = client:receive()
+				table.insert(params, param)	
+			end
          
-			local param1, err = client:receive()
+--			local param1, err = client:receive()
 
-                  table.insert(params, param1)
+--                  	table.insert(params, param1)
 
-                  -- require 'pl.pretty'.dump(params)
+                  	require 'pl.pretty'.dump(params)
+	                require 'pl.pretty'.dump(signatures)			
          
 			local result = object[name](table.unpack(params))
 
-                  client:send('\n') -- mensagem indicando sucesso no processamento da chamada pelo server
+                  	client:send('\n') -- mensagem indicando sucesso no processamento da chamada pelo server
 
 			client:send(result .. "\n") -- resultado da chamada
 
-                  client:close()
+                  	client:close()
 		end		
 	end
-
 end 
 
 -- valida os argumentos de entrada na proxy, retorna nil se não houver erros, ou o primeiro erro encontrado

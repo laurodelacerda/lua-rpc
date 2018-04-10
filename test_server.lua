@@ -21,7 +21,7 @@ myobj3 = {
   foo = function(a)
     return a
   end,
-  cast = function(a)
+  cast = function(a, b)
     return tonumber(a)
   end
 }

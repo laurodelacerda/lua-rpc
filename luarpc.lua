@@ -35,15 +35,72 @@ end
 local function packArgs(method, args, sig)
       local request = method..'\n'
       for i=1,#sig do
-            if (sig[i] == 'string' or sig[i] == 'char') then
-                  request = request..string.gsub(args[i], '\n', '\\:-)\\')
+            if (#args >= i) then
+                  if (sig[i] == 'string' or sig[i] == 'char') then
+                        request = request..string.gsub(args[i], '\n', '\\:-)\\')
+                  else
+                        request = request..tostring(args[i])
+                  end
             else
-                  request = request..tostring(args[i])
+                  if (sig[i] == 'double') then
+                        request = request..'0'  -- se for double completa com 0
+                  else
+                        request = request..'\n' -- se for char ou string ou void envia \n
+                  end
             end
 
             request = request..'\n'
       end
       return request
+end
+
+-- valida os argumentos de entrada na proxy, retorna nil se não houver erros, ou o primeiro erro encontrado
+local function validateLocalArgs(args, expectedArgs) 
+      for i=1, #expectedArgs do         
+            if (#args >= i) then  
+                  local t = type(args[i])
+                  if (expectedArgs[i] == 'double' and t ~= 'number') then
+                        return "Expected double and received "..tostring(t)
+                  elseif (expectedArgs[i] == 'char' and (t ~= 'string' or string.len(args[i]) > 1)) then
+                        if (t == 'string') then
+                              return "Expected char and received string with more than 1 character"
+                        else
+                              return "Expected char and received "..tostring(t)
+                        end
+                  elseif (expectedArgs[i] == 'string' and t ~= 'string') then
+                        return "Expected string and received "..tostring(t)
+                  end
+            end
+      end
+
+      return nil
+end
+
+-- converte os valores recebidos em 'args' para os tipos esperados descritos na tabela 'expectedArgs'
+-- se houver erros retorna uma string indicando o erro encontrado, caso contrário retorna nil
+-- obs: essa função altera os valores de args para os valores convertidos (typecast)
+local function unpackArgs(args, expectedArgs)
+      for i=1, #expectedArgs do
+            local value = nil
+            if (expectedArgs[i] == 'double') then
+                  value = tonumber(args[i])
+                  if not value then
+                        return "Expected double and received "..args[i]
+                  end
+            elseif (expectedArgs[i] == 'char') then
+                  value = string.gsub(args[i], '%\\%:%-%)%\\', '\n')
+                  if (string.len(value) > 1) then
+                        return "Expected char and received "..args[i]
+                  end
+            elseif (expectedArgs[i] == 'string') then
+                  value = string.gsub(args[i], '%\\%:%-%)%\\', '\n')
+            else
+                  value = args[i]
+            end
+            args[i] = value
+      end
+
+      return nil
 end
 
 function luarpc.createServant(servantObject, idl)
@@ -72,7 +129,7 @@ function luarpc.waitIncoming()
 -- TODO Tratar envio de mensagens fora do padrão do protocolo acordado.
 	while 1 do
 
-	local canRead = socket.select(servers, nil)
+	      local canRead = socket.select(servers, nil)
 
 		for _, server in ipairs(canRead) do
 
@@ -106,15 +163,12 @@ function luarpc.waitIncoming()
 
 			-- obtem o nome da função
 			local name, err = client:receive()
-			-- print(name)
 
-			local params = {}
+                  local prototypes = parser(idl)
 
-        		local prototypes = parser(idl)
+			local input = prototypes[name].input
 
-			local sig = prototypes[name].input
-
---			local args = select("#", sig)
+--			local args = select("#", input)
 --[[				
       for i=1, #expectedArgs do
             local t = type(args[i])
@@ -131,94 +185,37 @@ function luarpc.waitIncoming()
             end
       end
 --]]
-			for i=1, #sig do
+                  local params = {}
+
+			for i=1, #input do
 				local param, err = client:receive()
-				local t = type(param)
-				--print(t)
-				--print(sig[i])
-				if(sig[i] == 'double' and t~= 'number') then
-					param = tonumber(param)	
-					if(param == nil) then
-						client:send("ERRORLAURO: Expected double and received ".. tostring(t))
-					end			
-				elseif(sig[i] == 'string' and t~= 'string') then
-					param = tostring(param)
-				end
+				table.insert(params, param)
+                  end
 
-				table.insert(params, param)	
-			end
-         
---			local param1, err = client:receive()
+                  local inputError = unpackArgs(params, input)
 
---                  	table.insert(params, param1)
+                  print(inputError)
 
-                  	require 'pl.pretty'.dump(params)
-	                require 'pl.pretty'.dump(sig)			
-         
-			local result = object[name](table.unpack(params))
+                  if inputError then
+                        cliend:send(inputError)
+                        client:close()
+                  else
+                        local result = table.pack(object[name](table.unpack(params)))
 
-                  	client:send('\n') -- mensagem indicando sucesso no processamento da chamada pelo server
+                        client:send('\n') -- mensagem indicando sucesso no processamento da chamada pelo server
 
-			client:send(result .. "\n") -- resultado da chamada
+                        print('result dump: '..#result)
+                        require 'pl.pretty'.dump(result)
+
+                        for i=1, #result do
+                              client:send(string.gsub(result[i], "\n", "\\:-)\\").."\n") -- resultado da chamada
+                        end
 
                   	client:close()
+                  end
 		end		
 	end
 end 
-
--- valida os argumentos de entrada na proxy, retorna nil se não houver erros, ou o primeiro erro encontrado
-local function validateLocalArgs(args, expectedArgs) 
-      if (#args < #expectedArgs) then
-            return "Expected "..#expectedArgs.." arguments and received "..#args.." arguments"
-      end
-      for i=1, #expectedArgs do
-            local t = type(args[i])
-            if (expectedArgs[i] == 'double' and t ~= 'number') then
-                  return "Expected double and received "..tostring(t)
-            elseif (expectedArgs[i] == 'char' and (t ~= 'string' or string.len(args[i]) > 1)) then
-                  if (t == 'string') then
-                        return "Expected char and received string with more than 1 character"
-                  else
-                        return "Expected char and received "..tostring(t)
-                  end
-            elseif (expectedArgs[i] == 'string' and t ~= 'string') then
-                  return "Expected string and received "..tostring(t)
-            end
-      end
-
-      return nil
-end
-
--- converte os valores recebidos em 'args' para os tipos esperados descritos na tabela 'expectedArgs'
--- se houver erros retorna uma string indicando o erro encontrado, caso contrário retorna nil
--- obs: essa função altera os valores de args para os valores convertidos (typecast)
-local function unpackArgs(args, expectedArgs)
-      if (#args < #expectedArgs) then
-            return "Expected "..#expectedArgs.." arguments and received "..#args.." arguments"
-      end
-
-      for i=1, #expectedArgs do
-            local value = nil
-            if (expectedArgs[i] == 'double') then
-                  value = tonumber(args[i])
-                  if not value then
-                        return "Expected double and received "..args[i]
-                  end
-            elseif (expectedArgs[i] == 'char') then
-                  value = string.gsub(args[i], '%\\%:%-%)%\\', '\n')
-                  if (string.len(value) > 1) then
-                        return "Expected char and received "..args[i]
-                  end
-            elseif (expectedArgs[i] == 'string') then
-                  value = string.gsub(args[i], '%\\%:%-%)%\\', '\n')
-            else
-                  value = args[i]
-            end
-            args[i] = value
-      end
-
-      return nil
-end
 
 function luarpc.createProxy(hostname, port, idl)
       -- inicializa uma tabela vazia que será o stub do objeto remoto
@@ -262,9 +259,12 @@ function luarpc.createProxy(hostname, port, idl)
                   local result = {}
                   for i=1, #sig.output do
                         ans, err = server:receive()
-                        if err then
+
+                        if err and sig.output[i] ~= 'void' and err ~= 'closed' then
                               return '___ERRORPC: '..err
                         end
+
+                        print(ans)
 
                         table.insert(result, ans)
                   end
@@ -273,6 +273,10 @@ function luarpc.createProxy(hostname, port, idl)
                   local outputError = unpackArgs(result, sig.output)
                   if outputError then
                         return '___ERRORPC: '..outputError
+                  end
+
+                  if (sig.output[i] == 'void') then
+                        return
                   end
 
                   -- faz o unpack da tabela para retorno da função do lado do cliente

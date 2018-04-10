@@ -11,6 +11,21 @@ interface {
 				{ direction = "in", type = "double" },
 				{ direction = "in", type = "double" }
 			}
+		},
+		boo = {
+			resulttype = "string",
+			args = {
+				{ direction = "in", type = "double" },
+				{ direction = "in", type = "double" },
+				{ direction = "in", type = "string" },
+				{ direction = "out", type = "double" }
+			}
+		},
+		voidFunc = {
+			resulttype = "void",
+			args = {
+				{ direction = "in", type = "char" }
+			}
 		}
 	}		
 }

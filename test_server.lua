@@ -22,7 +22,13 @@ myobj3 = {
     return a
   end,
   cast = function(a, b)
-    return tonumber(a)
+    return tonumber(a + b)
+  end,
+  boo = function (a, b, c)
+    return c, a + b
+  end ,
+  voidFunc = function(a)
+    print(a)
   end
 }
 

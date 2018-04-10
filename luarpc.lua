@@ -2,6 +2,8 @@ local luarpc = {}
 local servers = {}
 local objects = {}
 
+local socket = require("socket")
+
 local function parser(idl)
 	local prototypes = {}
       
@@ -104,24 +106,17 @@ local function unpackArgs(args, expectedArgs)
 end
 
 function luarpc.createServant(servantObject, idl)
-	-- lendo a interface
-	io.input(idl)
-	local input = io.read("*all")
-	--input = string.gsub(input, "^interface", "return")
-	local f = loadstring(input)
-
-	-- reservando socket
-	socket = require("socket")
-	server = assert(socket.bind("*", 0))
-	local ip, port = server:getsockname()
+      
+      -- reservando socket
+	local server = assert(socket.bind("*", 0))
 
 	-- guardando o (socket, objeto) utilizado na tabela
 	table.insert(servers, server)
 
-	objects[server] = servantObject
+      -- guarda o objeto e a respectiva idl
+	objects[server] = { servantObject, idl }
 	
 	return server
-
 end
 
 function luarpc.waitIncoming()
@@ -145,22 +140,11 @@ function luarpc.waitIncoming()
 -- qualquer um dos objetos serventes criados anteriormente, atende esse pedido, 
 -- e volta a esperar o próximo pedido (ou seja, não há concorrência no servidor!). 
 -- Provavelmente você terá que usar a chamada select para programá-la.
-
-         for param, sig in pairs(prototypes[name]) do
-
-            local param, err = client:receive()
-
-            table.insert(params, param)
-            require 'pl.pretty'.dump(params)
-
-            -- local inputError = validateValueArgs()
-
-         end 
 --]] 
-			local object = objects[server]
+                  local object, idl = table.unpack(objects[server])
 
-			local client = server:accept()
-
+                  local client = server:accept()
+                  
 			-- obtem o nome da função
 			local name, err = client:receive()
 
@@ -168,23 +152,6 @@ function luarpc.waitIncoming()
 
 			local input = prototypes[name].input
 
---			local args = select("#", input)
---[[				
-      for i=1, #expectedArgs do
-            local t = type(args[i])
-            if (expectedArgs[i] == 'double' and t ~= 'number') then
-                  return "Expected double and received "..tostring(t)
-            elseif (expectedArgs[i] == 'char' and (t ~= 'string' or string.len(args[i]) > 1)) then
-                  if (t == 'string') then
-                        return "Expected char and received string with more than 1 character"
-                  else
-                        return "Expected char and received "..tostring(t)
-                  end
-            elseif (expectedArgs[i] == 'string' and t ~= 'string') then
-                  return "Expected string and received "..tostring(t)
-            end
-      end
---]]
                   local params = {}
 
 			for i=1, #input do
@@ -229,7 +196,6 @@ function luarpc.createProxy(hostname, port, idl)
                   end
             
                   -- abre a conexão com o servidor
-                  local socket = require("socket")
                   local server = socket.connect(hostname, port)
 
                   -- empacota os parametros

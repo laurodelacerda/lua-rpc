@@ -29,6 +29,9 @@ myobj3 = {
   end ,
   voidFunc = function(a)
     print(a)
+  end,
+  voidFunc2 = function()
+    print('voidFunc2')
   end
 }
 

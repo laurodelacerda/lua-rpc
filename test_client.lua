@@ -21,3 +21,8 @@ print("\ncall voidFunc")
 local result = client.voidFunc('a')
 print(type(result))
 print(result)
+
+
+print('\ncall voidFunc2')
+local result = client.voidFunc2()
+print(type(result))

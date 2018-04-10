@@ -193,9 +193,6 @@ function luarpc.waitIncoming()
                   end
 
                   local inputError = unpackArgs(params, input)
-
-                  print(inputError)
-
                   if inputError then
                         cliend:send(inputError)
                         client:close()
@@ -203,9 +200,6 @@ function luarpc.waitIncoming()
                         local result = table.pack(object[name](table.unpack(params)))
 
                         client:send('\n') -- mensagem indicando sucesso no processamento da chamada pelo server
-
-                        print('result dump: '..#result)
-                        require 'pl.pretty'.dump(result)
 
                         for i=1, #result do
                               client:send(string.gsub(result[i], "\n", "\\:-)\\").."\n") -- resultado da chamada

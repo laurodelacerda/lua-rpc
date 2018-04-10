@@ -26,6 +26,12 @@ interface {
 			args = {
 				{ direction = "in", type = "char" }
 			}
+		},
+		voidFunc2 = {
+			resulttype = "void",
+			args = {
+				{ direction = "in", type = "void" }
+			}
 		}
 	}		
 }

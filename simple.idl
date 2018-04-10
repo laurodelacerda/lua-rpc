@@ -8,7 +8,7 @@ interface {
 		cast = { 
 			resulttype = "double",
 			args = {
-				{ direction = "in", type = "string" },
+				{ direction = "in", type = "double" },
 				{ direction = "in", type = "double" }
 			}
 		}

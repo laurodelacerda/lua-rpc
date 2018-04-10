@@ -112,12 +112,39 @@ function luarpc.waitIncoming()
 
         		local prototypes = parser(idl)
 
-			local signatures = prototypes[name].input
+			local sig = prototypes[name].input
 
-			local args = select("#", signatures)
-
-			for i=1, args do
+--			local args = select("#", sig)
+--[[				
+      for i=1, #expectedArgs do
+            local t = type(args[i])
+            if (expectedArgs[i] == 'double' and t ~= 'number') then
+                  return "Expected double and received "..tostring(t)
+            elseif (expectedArgs[i] == 'char' and (t ~= 'string' or string.len(args[i]) > 1)) then
+                  if (t == 'string') then
+                        return "Expected char and received string with more than 1 character"
+                  else
+                        return "Expected char and received "..tostring(t)
+                  end
+            elseif (expectedArgs[i] == 'string' and t ~= 'string') then
+                  return "Expected string and received "..tostring(t)
+            end
+      end
+--]]
+			for i=1, #sig do
 				local param, err = client:receive()
+				local t = type(param)
+				--print(t)
+				--print(sig[i])
+				if(sig[i] == 'double' and t~= 'number') then
+					param = tonumber(param)	
+					if(param == nil) then
+						client:send("ERRORLAURO: Expected double and received ".. tostring(t))
+					end			
+				elseif(sig[i] == 'string' and t~= 'string') then
+					param = tostring(param)
+				end
+
 				table.insert(params, param)	
 			end
          
@@ -126,7 +153,7 @@ function luarpc.waitIncoming()
 --                  	table.insert(params, param1)
 
                   	require 'pl.pretty'.dump(params)
-	                require 'pl.pretty'.dump(signatures)			
+	                require 'pl.pretty'.dump(sig)			
          
 			local result = object[name](table.unpack(params))
 

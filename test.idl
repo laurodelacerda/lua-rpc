@@ -20,6 +20,16 @@ interface {	name = "testIdl",
                 args = {
                     { direction = "in", type = "string" }
                 }
+            },
+            too = {
+                resulttype = "void",
+                args = {
+                    { direction = "in", type = "string" },
+                    { direction = "in", type = "string" },
+                    { direction = "in", type = "string" },
+                    { direction = "in", type = "string" },
+                    { direction = "in", type = "string" }
+                }
             }
 		}		
 	}

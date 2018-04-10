@@ -1,8 +1,15 @@
-interface {	name = "simpleIdl",
-		methods = {
+interface {	
+	name = "simpleIdl",
+	methods = {
 		foo = {resulttype = "string",
 		 	args = {{ direction = "in", type = "string"}}
 
+		},
+		cast = { 
+			resulttype = "double",
+			args = {
+				{ direction = "in", type = "string" }
+			}
 		}
-		}		
-	}
+	}		
+}

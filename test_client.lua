@@ -4,5 +4,8 @@ local idl = "simple.idl"
 
 client = luarpc.createProxy("localhost", arg[1], idl)
 
-print(client.foo("teste"))
+local resultFoo = client.foo("teste\nteste")
+print(type(resultFoo).." -> "..resultFoo)
 
+local resultCast = client.cast("123")
+print(type(resultCast).." -> "..resultCast)

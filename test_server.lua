@@ -37,22 +37,25 @@ myobj3 = {
 
 luarpc = require("luarpc")
 
-local server1, status = luarpc.createServant(myobj3, "simple.idl")
+local server1, status1 = luarpc.createServant(myobj3, "simple.idl")
 
-if server1 then 
+print(server1, status1)
+
+if not status1 then 
   local ip, port1 = server1:getsockname() 
-  print(status .. ' ' .. port1)
+  print(port1)
 else
-  print(status)
+  print(status1)
 end
 
-local server2, status = luarpc.createServant(myobj1, "lua.idl")
+local server2, status2 = luarpc.createServant(myobj1, "lua.idl")
+print(server2, status2)
 
-if server2 then 
+if not status2 then 
   local ip, port2 = server2:getsockname() 
-  print(status .. ' ' .. port2)
+  print(port2)
 else
-  print(status)
+  print(status2)
 end
 
 luarpc.waitIncoming()

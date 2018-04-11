@@ -160,6 +160,9 @@ end
 function luarpc.createServant(servantObject, idl)
       
       local errorIdl = validateIdl(servantObject, idl)
+      if errorIdl then
+            return nil, '___ERRORPC: ' .. errorIdl      
+      end
 
       -- reservando socket
       local server = assert(socket.bind("*", 0))
@@ -169,12 +172,8 @@ function luarpc.createServant(servantObject, idl)
 
       -- guarda o objeto e a respectiva idl
       objects[server] = { servantObject, idl }
-
-      if errorIdl then
-            return nil, '___ERRORPC: ' .. errorIdl
-      else
-            return server, '\n'
-      end
+      
+      return server, nil
 end
 
 function luarpc.waitIncoming()

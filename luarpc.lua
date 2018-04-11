@@ -171,9 +171,9 @@ function luarpc.createServant(servantObject, idl)
       objects[server] = { servantObject, idl }
 
       if errorIdl then
-            return '___ERRORPC: ' .. errorIdl, server
+            return nil, '___ERRORPC: ' .. errorIdl
       else
-            return '\n', server
+            return server, '\n'
       end
 end
 

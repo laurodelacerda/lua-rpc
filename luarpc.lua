@@ -5,7 +5,7 @@ local objects = {}
 local socket = require("socket")
 
 local function parser(idl)
-	local prototypes = {}
+      local prototypes = {}
       
       -- função que lê a idl e cria uma tabela com subtabelas input e output
       function interface(idl)
@@ -31,29 +31,59 @@ local function parser(idl)
       -- carrega a idl
       dofile(idl)
 
-	return prototypes
+      return prototypes
 end
 
-local function packArgs(method, args, sig)
-      local request = method..'\n'
-      for i=1,#sig do
-            if (#args >= i) then
-                  if (sig[i] == 'string' or sig[i] == 'char') then
-                        request = request..string.gsub(args[i], '\n', '\\:-)\\')
-                  else
-                        request = request..tostring(args[i])
-                  end
-            else
-                  if (sig[i] == 'double') then
-                        request = request..'0'  -- se for double completa com 0
-                  else
-                        request = request..'\n' -- se for char ou string ou void envia \n
-                  end
-            end
+local function compareArrays(table1, table2)
 
-            request = request..'\n'
+      if #table1 ~= #table2 then
+            return false
       end
-      return request
+
+      local i = 1
+      local j = 1
+
+      local count = 0
+
+      while i <= #table1 do
+            if j > #table2 then
+                  return false
+            elseif string.match(table1[i], table2[j]) then               
+                  count = count + 1
+                  i = i + 1
+                  j = 1
+            else
+                  j = j + 1
+            end
+      end
+
+      if #table1 == count then
+            return true
+      else
+            return false
+      end
+end   
+
+local function validateIdl(object, idl)
+
+      local idlMethods = {}
+      local objMethods = {}
+
+      local i = parser(idl)      
+
+      for k in pairs(i) do 
+            table.insert(idlMethods, k)            
+      end
+
+      for j in pairs(object) do 
+            table.insert(objMethods, j)            
+      end
+
+      if compareArrays(idlMethods, objMethods) then
+            return nil
+      else
+            return 'The object is not IDL compliant.'
+      end
 end
 
 -- valida os argumentos de entrada na proxy, retorna nil se não houver erros, ou o primeiro erro encontrado
@@ -76,6 +106,28 @@ local function validateLocalArgs(args, expectedArgs)
       end
 
       return nil
+end
+
+local function packArgs(method, args, sig)
+      local request = method..'\n'
+      for i=1,#sig do
+            if (#args >= i) then
+                  if (sig[i] == 'string' or sig[i] == 'char') then
+                        request = request..string.gsub(args[i], '\n', '\\:-)\\')
+                  else
+                        request = request..tostring(args[i])
+                  end
+            else
+                  if (sig[i] == 'double') then
+                        request = request..'0'  -- se for double completa com 0
+                  else
+                        request = request..'\n' -- se for char ou string ou void envia \n
+                  end
+            end
+
+            request = request..'\n'
+      end
+      return request
 end
 
 -- converte os valores recebidos em 'args' para os tipos esperados descritos na tabela 'expectedArgs'
@@ -107,56 +159,49 @@ end
 
 function luarpc.createServant(servantObject, idl)
       
-      -- reservando socket
-	local server = assert(socket.bind("*", 0))
+      local errorIdl = validateIdl(servantObject, idl)
 
-	-- guardando o (socket, objeto) utilizado na tabela
-	table.insert(servers, server)
+      -- reservando socket
+      local server = assert(socket.bind("*", 0))
+
+      -- guardando o (socket, objeto) utilizado na tabela
+      table.insert(servers, server)
 
       -- guarda o objeto e a respectiva idl
-	objects[server] = { servantObject, idl }
-	
-	return server
+      objects[server] = { servantObject, idl }
+
+      if errorIdl then
+            return '___ERRORPC: ' .. errorIdl, server
+      else
+            return '\n', server
+      end
 end
 
 function luarpc.waitIncoming()
 
 -- TODO Tratar envio de mensagens fora do padrão do protocolo acordado.
-	while 1 do
+      while 1 do
 
-	      local canRead = socket.select(servers, nil)
+            local canRead = socket.select(servers, nil)
 
-		for _, server in ipairs(canRead) do
+            for _, server in ipairs(canRead) do
 
---[[
--- O código cliente deve tentar fazer a conversão dos argumentos que 
--- foram enviados para tipos especificados na interface (e gerar erros nos casos 
--- em que isso não é possível: por exemplo, se o programa fornece um string com 
--- letras onde se espera um parâmetro double). 
-
--- A função luarpc.waitIncoming pode ser executada depois de diversas chamadas a
--- luarpc.createServant, como indicado no exemplo, e deve fazer com que o processo
--- servidor entre em um loop onde ele espera pedidos de execução de chamadas a 
--- qualquer um dos objetos serventes criados anteriormente, atende esse pedido, 
--- e volta a esperar o próximo pedido (ou seja, não há concorrência no servidor!). 
--- Provavelmente você terá que usar a chamada select para programá-la.
---]] 
                   local object, idl = table.unpack(objects[server])
 
                   local client = server:accept()
                   
-			-- obtem o nome da função
-			local name, err = client:receive()
+                  -- obtem o nome da função
+                  local name, err = client:receive()
 
                   local prototypes = parser(idl)
 
-			local input = prototypes[name].input
+                  local input = prototypes[name].input
 
                   local params = {}
 
-			for i=1, #input do
-				local param, err = client:receive()
-				table.insert(params, param)
+                  for i=1, #input do
+                        local param, err = client:receive()
+                        table.insert(params, param)
                   end
 
                   local inputError = unpackArgs(params, input)
@@ -172,10 +217,10 @@ function luarpc.waitIncoming()
                               client:send(string.gsub(result[i], "\n", "\\:-)\\").."\n") -- resultado da chamada
                         end
 
-                  	client:close()
+                        client:close()
                   end
-		end		
-	end
+            end         
+      end
 end 
 
 function luarpc.createProxy(hostname, port, idl)
@@ -242,7 +287,7 @@ function luarpc.createProxy(hostname, port, idl)
                   -- faz o unpack da tabela para retorno da função do lado do cliente
                   return table.unpack(result)
             end
-	end
+      end
 
       return proxy
 end

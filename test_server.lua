@@ -17,7 +17,7 @@ myobj2 = { foo =
              end
         }
 
-myobj3 = {	
+myobj3 = {  
   foo = function(a)
     return a
   end,
@@ -37,12 +37,12 @@ myobj3 = {
 
 luarpc = require("luarpc")
 
-local server1 = luarpc.createServant(myobj3, "simple.idl")
+local status1, server1 = luarpc.createServant(myobj3, "simple.idl")
 local ip, port1 = server1:getsockname()
-print(port1)
+print(status1 .. ' ' .. port1)
 
-local server2 = luarpc.createServant(myobj1, "lua.idl")
+local status2, server2 = luarpc.createServant(myobj1, "lua.idl")
 local ip, port2 = server2:getsockname()
-print(port2)
+print(status2 .. ' ' .. port2)
 
 luarpc.waitIncoming()
